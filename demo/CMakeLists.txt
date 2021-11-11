@@ -52,6 +52,29 @@ target_link_libraries(spmm_demo
         ${SPMM_DEMO_LIBS})
 
 
+if(EXISTS ${MOSEK_INC})
+    set(MSK_SOURCE_FILES mosek.cpp Mosek/QuadProgMosek.cpp)
+    ADD_DEFINITIONS(-DkMosekLicensePath="$ENV{HOME}/mosek/mosek.lic")
+    add_executable(mosekTSP_demo
+            TSPMosekDemo.cpp
+            ${SRC}
+            ${TRCGEN}
+            ${MATRIX_PARSING_SRC}
+            ${Sympiler_SRC}
+            ${METIS_SOURCE_FILES} ${SPMV_CODELETS_SRC} ${SPTRSV_CODELETS_SRC}
+            ${SPMM_CODELETS_SRC}
+            ../src/MosekTSP.cpp
+            )
+    target_link_directories(mosekTSP_demo PRIVATE
+            ${MOSEK_LIB} )
+    target_link_libraries(mosekTSP_demo
+            mosek64
+            fusion64
+            ${Sympiler_Libs}
+            )
+endif()
+
+
 
 set(DEMO_LIBS lbc)
 
@@ -64,6 +87,7 @@ if (MKL_FOUND)
 endif()
 
 if (PAPI_FOUND)
+    message("--------> ${PAPI_LIBRARIES}")
     set(DEMO_LIBS ${DEMO_LIBS} ${PAPI_LIBRARIES})
 endif()
 

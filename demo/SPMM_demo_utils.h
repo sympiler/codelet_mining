@@ -29,11 +29,69 @@ namespace sparse_avx {
         }
     }
 
-    void spmm_csr_csr(double* Cx, double* Ax, double* Bx, int m, int* Ap, int* Ai, int bRows, int bCols) {
+    struct spmm_prof{
+     int size1, size2, size3;
+     int *cnt1, *cnt2, *cnt3;
+     int reuse_f1, reuse_f2, reuse_f3;
+     int reuse_g1, reuse_g2, reuse_g3;
+    };
+
+ void spmm_csr_csr_profiler(double* Cx, double* Ax, double* Bx, int m, int* Ap,
+                        int* Ai, int bRows, int bCols, spmm_prof &sp) {
+  sp.size1 = bRows*bCols;
+  sp.size2 = Ap[m];
+  sp.size3 = bRows*bCols;
+  sp.cnt1 = new int[sp.size1]();
+  sp.cnt2 = new int[sp.size2]();
+  sp.cnt3 = new int[sp.size3]();
+  for (int i = 0; i < m; ++i) {
+    for (int j = Ap[i]; j < Ap[i+1]; ++j) {
+      for (int k = 0; k < bCols; ++k) {
+         Cx[i*bCols+k] += Ax[j] * Bx[Ai[j]*bCols+k];
+         sp.cnt1[i*bCols+k]++;
+         sp.cnt2[j]++;
+         //  assert(sp.cnt2[j]<2);
+         sp.cnt3[Ai[j]*bCols+k]++;
+         std::cout<< i*bCols+k << "," << j << "," <<Ai[j]*bCols+k
+                  <<"\n";
+      }
+    }
+  }
+  sp.reuse_f1 = sp.reuse_f2 = sp.reuse_f3 = 0;
+  for (int i = 0; i < sp.size1; ++i) {
+   sp.reuse_f1 += (sp.cnt1[i]-1);
+   sp.reuse_f3 += (sp.cnt3[i]-1);
+   sp.cnt1[i]=0; sp.cnt3[i]=0;
+  }
+  for (int i = 0; i < sp.size2; ++i) {
+   sp.reuse_f2 += (sp.cnt2[i]-1); sp.cnt2[i]=0;
+  }
+  for (int i = 0; i < m; ++i) {
+   for (int k = 0; k < bCols; ++k) {
+    for (int j = Ap[i]; j < Ap[i+1]; ++j) {
+     Cx[i*bCols+k] += Ax[j] * Bx[Ai[j]*bCols+k];
+     sp.cnt1[i*bCols+k]++;
+     sp.cnt2[j]++;
+     sp.cnt3[Ai[j]*bCols+k]++;
+    }
+   }
+  }
+  sp.reuse_g1 = sp.reuse_g2 = sp.reuse_g3 = 0;
+  for (int i = 0; i < sp.size1; ++i) {
+   sp.reuse_g1 += sp.cnt1[i];
+   sp.reuse_g3 += sp.cnt3[i];
+   sp.cnt1[i]=0; sp.cnt3[i]=0;
+  }
+  for (int i = 0; i < sp.size2; ++i) {
+   sp.reuse_g2 += sp.cnt2[i]; sp.cnt2[i]=0;
+  }
+ }
+
+ void spmm_csr_csr(double* Cx, double* Ax, double* Bx, int m, int* Ap, int* Ai, int bRows, int bCols) {
 #pragma omp parallel for
         for (int i = 0; i < m; ++i) {
-            for (int j = Ap[i]; j < Ap[i+1]; ++j) {
-                for (int k = 0; k < bCols; ++k) {
+          for (int j = Ap[i]; j < Ap[i+1]; ++j) {
+           for (int k = 0; k < bCols; ++k) {
                     Cx[i*bCols+k] += Ax[j] * Bx[Ai[j]*bCols+k];
                 }
             }
@@ -188,14 +246,50 @@ namespace sparse_avx {
       }
     }
 
-    class SpMMSerial : public sym_lib::FusionDemo {
-      protected:
-        double* Bx;
-        int bRows, bCols;
-        sym_lib::timing_measurement fused_code() override {
-          sym_lib::timing_measurement t1;
+ class SpMMProfile : public sym_lib::FusionDemo {
+  spmm_prof sp;
+ protected:
+  double* Bx;
+  int bRows, bCols;
+  sym_lib::timing_measurement fused_code() override {
+   sym_lib::timing_measurement t1;
+   t1.start_timer();
+   spmm_csr_csr_profiler(x_, L1_csr_->x, Bx, L1_csr_->m, L1_csr_->p,
+                         L1_csr_->i, bRows, bCols, sp);
+   t1.measure_elapsed_time();
+   //            std::copy(x_,x_+L1_csr_->m*cbb,x_);
+   return t1;
+  }
+
+ public:
+  SpMMProfile(sym_lib::CSR *L, sym_lib::CSC *L_csc, int bRows, int bCols,
+             std::string name)
+    : FusionDemo(L->m*bCols, name) {
+   L1_csr_ = L;
+   L1_csc_ = L_csc;
+   this->Bx = new double[bRows*bCols];
+   num_test_ = 1;
+   for (int i = 0; i < bRows*bCols; i++) {
+    this->Bx[i] = 1;
+   }
+   this->bRows = bRows;
+   this->bCols = bCols;
+  };
+
+  ~SpMMProfile() override {
+   delete[] Bx;
+  }
+ };
+
+ class SpMMSerial : public sym_lib::FusionDemo {
+ protected:
+  double* Bx;
+  int bRows, bCols;
+  sym_lib::timing_measurement fused_code() override {
+   sym_lib::timing_measurement t1;
           t1.start_timer();
-          spmm_csr_csr(x_, L1_csr_->x, Bx, L1_csr_->m, L1_csr_->p, L1_csr_->i, bRows, bCols);
+          spmm_csr_csr(x_, L1_csr_->x, Bx, L1_csr_->m, L1_csr_->p,
+                        L1_csr_->i, bRows, bCols);
           t1.measure_elapsed_time();
           //            std::copy(x_,x_+L1_csr_->m*cbb,x_);
           return t1;

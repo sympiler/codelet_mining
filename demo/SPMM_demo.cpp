@@ -8,7 +8,7 @@
 #include <sparse_io.h>
 #include <sparse_utilities.h>
 
-#define PROFILE
+//#define PROFILE
 
 #ifdef PAPI
 #include "Profiler.h"
@@ -57,10 +57,15 @@ int main(int argc, char *argv[]) {
     std::cout << "\n";
 #else
     auto *sps = new sparse_avx::SpMMSerial(B, A_full, bRows, bCols, "SpMM Serial");
-    auto spmm_baseline = sps->evaluate();
+    //auto spmm_baseline = sps->evaluate();
     double *sol_spmm = sps->solution();
     std::copy(sol_spmm,sol_spmm+A_full->m*bCols,final_solution);
     delete sps;
+
+    auto *spp = new sparse_avx::SpMMProfile(B, A_full, bRows, bCols, "SpMM "
+                                                                      "Profiler");
+    spp->evaluate();
+    delete spp;
 
     auto *spsp = new sparse_avx::SpMMParallel(B, A_full, final_solution, bRows, bCols, "SpMM Parallel");
     spsp->set_num_threads(config.nThread);
@@ -87,7 +92,10 @@ int main(int argc, char *argv[]) {
                      "Baseline,SpMM MKL"
                   << "\n";
     }
-    std::cout << config.matrixPath << "," << config.mTileSize << "," << config.nTileSize << "," << config.bMatrixCols << "," <<spmm_baseline.elapsed_time << "," << spmm_parallel_baseline_elapsed << "," << spmm_tiled_parallel_baseline_elapsed << "," << spmm_mkl_eval_elapsed << "\n";
+  //  std::cout << config.matrixPath << "," << config.mTileSize << "," <<
+ // config.nTileSize << "," << config.bMatrixCols << "," <<spmm_baseline
+ //.elapsed_time << "," << spmm_parallel_baseline_elapsed << "," <<
+ //spmm_tiled_parallel_baseline_elapsed << "," << spmm_mkl_eval_elapsed << "\n";
 #endif
 
     delete A;

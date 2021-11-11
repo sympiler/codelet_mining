@@ -51,6 +51,14 @@ if ($ENV{PROFILE})
     )
 endif()
 
+#if ($ENV{MOSEKROOT})
+set(MOSEK_INC "$ENV{MOSEKROOT}/h")
+set(MOSEK_LIB "$ENV{MOSEKROOT}/bin")
+    include_directories(
+            ${MOSEK_INC}
+    )
+#endif()
+
 
 include_directories("${CMAKE_CURRENT_LIST_DIR}/include")
 include_directories("${CMAKE_CURRENT_LIST_DIR}/src/trace_gen")
