@@ -25,8 +25,8 @@ namespace MOSEK{
   M->constraint(x, Domain::lessThan( A ));
 
   M->objective(ObjectiveSense::Minimize, Expr::dot(C, x));
-
-  if (remove_1_hop_loops)
+  M->solve();
+  /*if (remove_1_hop_loops)
    M->constraint(x->diag(), Domain::equalsTo(0.));
 
   if (remove_2_hop_loops)
@@ -92,7 +92,7 @@ namespace MOSEK{
 
     M->constraint(Expr::sum(x->pick(tmp)), Domain::lessThan( 1.0 * csize - 1 ));
    }
-  }
+  }*/
   try {
    auto xlevel = x->level();
    std::cout << "Solution\n";

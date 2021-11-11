@@ -38,7 +38,7 @@ int main(int argc, char *argv[]){
   for (int j = A_full->p[i]; j < A_full->p[i+1]; ++j) {
    (*A_i)(j) = i;
    (*A_j)(j) = A_full->i[j];
-   (*A_x)(j) = A->x[j];
+   (*A_x)(j) = A_full->x[j];
   }
  }
  //auto A_x = new_array_ptr<double, 1>({1., 1., 1., 1., 0.1, 0.1, 0.1, 0.1});
@@ -47,10 +47,10 @@ int main(int argc, char *argv[]){
  MOSEK::tsp(n, Matrix::sparse(n, n, A_i, A_j, 1.),
             Matrix::sparse(n, n, A_i,A_j,A_x),
             true, false);
- MOSEK::tsp(n, Matrix::sparse(n, n, A_i, A_j, 1.),
+/* MOSEK::tsp(n, Matrix::sparse(n, n, A_i, A_j, 1.),
             Matrix::sparse(n, n, A_i,A_j,A_x),
             true, true);
-
+*/
  delete A_full;
  delete B;
  return 0;
